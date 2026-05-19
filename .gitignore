@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+user-service/node_modules/
+
+# Build output
+dist/
+user-service/dist/
+
+# Environment files
+.env
+.env.*
+!.env.example
+user-service/.env
+user-service/.env.*
+!user-service/.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Coverage
+coverage/
+
+# TypeScript
+*.tsbuildinfo
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
