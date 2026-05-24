@@ -1,3 +1,5 @@
+name: GoTrack
+
 services:
   user-service:
     image: node:20-alpine
@@ -36,6 +38,17 @@ services:
       timeout: 5s
       retries: 5
 
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "8081:80"
+    depends_on:
+      - postgres
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -50,7 +63,16 @@ services:
       timeout: 5s
       retries: 5
 
+  redis-insight:
+    image: redis/redisinsight:latest
+    restart: unless-stopped
+    ports:
+      - "5540:5540"
+    volumes:
+      - redis_insight_data:/data
+
 volumes:
   postgres_data:
   redis_data:
+  redis_insight_data:
   user_service_node_modules:
