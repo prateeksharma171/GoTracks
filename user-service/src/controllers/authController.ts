@@ -6,6 +6,7 @@ import {
   logoutUser,
   refreshUserToken,
   signupUser,
+  verifySignupOtp
 } from "../services/authService.js";
 import { verifyRefreshToken } from "../utils/tokens.js";
 
@@ -24,21 +25,47 @@ export const signup = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { name, email, password } = req.body as {
-      name?: string;
+    const { firstName, lastName, email, password } = req.body as {
+      firstName?: string;
+      lastName?: string;
       email?: string;
       password?: string;
     };
 
-    if (!name || !email || !password) {
-      throw new AppError("name, email, and password are required", 400);
+    if (!firstName || !lastName || !email || !password) {
+      throw new AppError("firstName, lastName, email, and password are required", 400);
     }
 
-    const authPayload = await signupUser({ name, email, password });
-    setRefreshTokenCookie(res, authPayload.refreshToken);
+    const signupResponse = await signupUser({ firstName, lastName, email, password });
 
     res.status(201).json({
-      message: "Signup successful",
+      ...signupResponse,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifyOtp = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { email, otp } = req.body as {
+      email?: string;
+      otp?: string;
+    };
+
+    if (!email || !otp) {
+      throw new AppError("Email and OTP are required", 400);
+    }
+
+    const authPayload = await verifySignupOtp({ email, otp });
+    setRefreshTokenCookie(res, authPayload.refreshToken);
+
+    res.status(200).json({
+      message: "Email verified successfully",
       ...authPayload,
     });
   } catch (error) {

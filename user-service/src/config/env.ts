@@ -26,7 +26,7 @@ const parseAllowedOrigins = (value: string | undefined): string[] => {
 
 const getJwtExpiry = (
   key: string,
-  fallback: SignOptions["expiresIn"]
+  fallback: SignOptions["expiresIn"],
 ): SignOptions["expiresIn"] => {
   return (process.env[key] ?? fallback) as SignOptions["expiresIn"];
 };
@@ -46,5 +46,9 @@ export const env = {
   accessTokenSecret: getRequiredEnv("ACCESS_TOKEN_SECRET"),
   refreshTokenSecret: getRequiredEnv("REFRESH_TOKEN_SECRET"),
   accessTokenExpiresIn: getJwtExpiry("ACCESS_TOKEN_EXPIRES_IN", "15m"),
-  refreshTokenExpiresIn: getJwtExpiry("REFRESH_TOKEN_EXPIRES_IN", "7d")
+  refreshTokenExpiresIn: getJwtExpiry("REFRESH_TOKEN_EXPIRES_IN", "7d"),
+  emailOtpExpiresInMinutes: Number(process.env.EMAIL_OTP_EXPIRES_IN_MINUTES ?? 10),
+  resendApiKey: getRequiredEnv("RESEND_API_KEY"),
+  resendFromEmail: getRequiredEnv("RESEND_FROM_EMAIL"),
+  resendFromName: process.env.RESEND_FROM_NAME ?? "GoTracks"
 };

@@ -20,9 +20,9 @@ app.use(
     stream: {
       write: (message: string) => {
         logger.info(message.trim());
-      }
-    }
-  })
+      },
+    },
+  }),
 );
 app.use(corsMiddleware);
 app.use(express.json());
