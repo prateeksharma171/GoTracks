@@ -27,9 +27,9 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.1",
+    "nodemailer": "^8.0.8",
     "postgres": "^3.4.9",
-    "redis": "^5.12.1",
-    "resend": "^6.12.3"
+    "redis": "^5.12.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",
@@ -39,6 +39,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/node": "^25.9.0",
+    "@types/nodemailer": "^8.0.0",
     "drizzle-kit": "^0.31.7",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",

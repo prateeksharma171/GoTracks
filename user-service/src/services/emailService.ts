@@ -1,4 +1,4 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { env } from "../config/env.js";
 import { buildOtpTemplate } from "../templates/otpTemplate.js";
 import { AppError } from "../utils/AppError.js";
@@ -11,19 +11,29 @@ type SendOtpEmailInput = {
   expiresInMinutes?: number;
 };
 
-class ResendSingleton {
-  private static client: Resend | null = null;
+class MailTransportSingleton {
+  private static transporter: nodemailer.Transporter | null = null;
 
-  static getClient(): Resend {
-    if (!this.client) {
-      this.client = new Resend(env.resendApiKey);
+  static getTransporter(): nodemailer.Transporter {
+    if (!this.transporter) {
+      this.transporter = nodemailer.createTransport({
+        host: env.smtpHost,
+        port: env.smtpPort,
+        secure: env.smtpSecure,
+        requireTLS: env.smtpRequireTls,
+        auth: {
+          user: env.smtpUser,
+          pass: env.smtpPass,
+        },
+      });
     }
 
-    return this.client;
+    return this.transporter;
   }
 }
 
-export const getResendClient = (): Resend => ResendSingleton.getClient();
+export const getMailTransporter = (): nodemailer.Transporter =>
+  MailTransportSingleton.getTransporter();
 
 export const sendOtpEmail = async ({
   to,
@@ -31,7 +41,7 @@ export const sendOtpEmail = async ({
   recipientName,
   expiresInMinutes = 5,
 }: SendOtpEmailInput) => {
-  const resend = getResendClient();
+  const transporter = getMailTransporter();
   const template = buildOtpTemplate({
     appName: env.serviceName,
     otp,
@@ -39,18 +49,17 @@ export const sendOtpEmail = async ({
     expiresInMinutes,
   });
 
-  const response = await resend.emails.send({
-    from: `${env.resendFromName} <${env.resendFromEmail}>`,
-    to,
-    subject: template.subject,
-    html: template.html,
-    text: template.text,
-  });
-
-  if (response.error) {
-    logger.error("Failed to send OTP email", response.error);
-    throw new AppError(response.error.message, 502);
+  try {
+    return await transporter.sendMail({
+      from: `"${env.smtpFromName}" <${env.smtpFromEmail}>`,
+      sender: `"${env.smtpFromName}" <${env.smtpFromEmail}>`,
+      to,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+  } catch (error) {
+    logger.error("Failed to send OTP email", error);
+    throw new AppError("Failed to send OTP email", 502);
   }
-
-  return response;
 };

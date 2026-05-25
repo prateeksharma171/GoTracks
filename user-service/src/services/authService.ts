@@ -30,6 +30,10 @@ type VerifySignupOtpInput = {
   otp: string;
 };
 
+type RegenerateSignupOtpInput = {
+  email: string;
+};
+
 type AuthPayload = {
   accessToken: string;
   refreshToken: string;
@@ -52,9 +56,12 @@ type SignupResponse = {
     isEmailVerified: boolean;
   };
   otpExpiresInMinutes: number;
+  remainingOtpRequestsInHour: number;
 };
 
 const buildOtpRedisKey = (userId: string): string => `auth:email-otp:${userId}`;
+const buildOtpRateLimitKey = (userId: string): string =>
+  `auth:email-otp:requests:${userId}`;
 
 const generateOtp = (): string => randomInt(100000, 1000000).toString();
 
@@ -97,12 +104,56 @@ const storeSignupOtp = async (userId: string, otp: string): Promise<void> => {
   const redisClient = getRedisClient();
 
   await connectRedis();
+  await redisClient.del(buildOtpRedisKey(userId));
   await redisClient.set(buildOtpRedisKey(userId), otpHash, {
     expiration: {
       type: "EX",
       value: env.emailOtpExpiresInMinutes * 60,
     },
   });
+};
+
+const consumeOtpRequestQuota = async (userId: string): Promise<number> => {
+  const redisClient = getRedisClient();
+  const otpRateLimitKey = buildOtpRateLimitKey(userId);
+
+  await connectRedis();
+  const totalRequests = await redisClient.incr(otpRateLimitKey);
+
+  if (totalRequests === 1) {
+    await redisClient.expire(otpRateLimitKey, 60 * 60);
+  }
+
+  if (totalRequests > env.emailOtpMaxPerHour) {
+    throw new AppError(
+      `You can generate only ${env.emailOtpMaxPerHour} OTPs in one hour. Please try again later.`,
+      429,
+    );
+  }
+
+  return env.emailOtpMaxPerHour - totalRequests;
+};
+
+const issueSignupOtp = async (
+  userRecord: SelectUser,
+  message: string,
+): Promise<Pick<SignupResponse, "message" | "otpExpiresInMinutes" | "remainingOtpRequestsInHour">> => {
+  const otp = generateOtp();
+  const remainingOtpRequestsInHour = await consumeOtpRequestQuota(userRecord.id);
+
+  await storeSignupOtp(userRecord.id, otp);
+  await sendOtpEmail({
+    to: userRecord.email,
+    otp,
+    recipientName: `${userRecord.firstName} ${userRecord.lastName}`,
+    expiresInMinutes: env.emailOtpExpiresInMinutes,
+  });
+
+  return {
+    message,
+    otpExpiresInMinutes: env.emailOtpExpiresInMinutes,
+    remainingOtpRequestsInHour,
+  };
 };
 
 export const signupUser = async ({
@@ -120,7 +171,6 @@ export const signupUser = async ({
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const otp = generateOtp();
 
   let userRecord: SelectUser;
 
@@ -155,19 +205,13 @@ export const signupUser = async ({
     userRecord = createdUser;
   }
 
-  await storeSignupOtp(userRecord.id, otp);
-  const emailResponse = await sendOtpEmail({
-    to: userRecord.email,
-    otp,
-    recipientName: `${userRecord.firstName} ${userRecord.lastName}`,
-    expiresInMinutes: env.emailOtpExpiresInMinutes,
-  });
-
-  console.log("emailResponse", emailResponse);
+  const otpDispatch = await issueSignupOtp(
+    userRecord,
+    "Signup successful. Verify the OTP sent to your email to activate your account.",
+  );
 
   return {
-    message:
-      "Signup successful. Verify the OTP sent to your email to activate your account.",
+    message: otpDispatch.message,
     user: {
       id: userRecord.id,
       firstName: userRecord.firstName,
@@ -175,8 +219,30 @@ export const signupUser = async ({
       email: userRecord.email,
       isEmailVerified: userRecord.isEmailVerified,
     },
-    otpExpiresInMinutes: env.emailOtpExpiresInMinutes,
+    otpExpiresInMinutes: otpDispatch.otpExpiresInMinutes,
+    remainingOtpRequestsInHour: otpDispatch.remainingOtpRequestsInHour,
   };
+};
+
+export const regenerateSignupOtp = async ({
+  email,
+}: RegenerateSignupOtpInput): Promise<Pick<SignupResponse, "message" | "otpExpiresInMinutes" | "remainingOtpRequestsInHour">> => {
+  const existingUser = await db.query.users.findFirst({
+    where: eq(users.email, email),
+  });
+
+  if (!existingUser) {
+    throw new AppError("User not found", 404);
+  }
+
+  if (existingUser.isEmailVerified) {
+    throw new AppError("Email is already verified", 409);
+  }
+
+  return issueSignupOtp(
+    existingUser,
+    "A new OTP has been sent to your email address.",
+  );
 };
 
 export const loginUser = async ({
@@ -257,6 +323,7 @@ export const verifySignupOtp = async ({
     .returning();
 
   await redisClient.del(buildOtpRedisKey(existingUser.id));
+  await redisClient.del(buildOtpRateLimitKey(existingUser.id));
 
   const authPayload = buildAuthPayload(verifiedUser);
   await storeRefreshToken(verifiedUser.id, authPayload.refreshToken);

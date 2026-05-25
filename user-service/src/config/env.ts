@@ -31,6 +31,16 @@ const getJwtExpiry = (
   return (process.env[key] ?? fallback) as SignOptions["expiresIn"];
 };
 
+const getBooleanEnv = (key: string, fallback: boolean): boolean => {
+  const value = process.env[key];
+
+  if (value === undefined) {
+    return fallback;
+  }
+
+  return value.toLowerCase() === "true";
+};
+
 export const env = {
   serviceName: getRequiredEnv("SERVICE_NAME"),
   nodeEnv: process.env.NODE_ENV ?? "development",
@@ -48,7 +58,13 @@ export const env = {
   accessTokenExpiresIn: getJwtExpiry("ACCESS_TOKEN_EXPIRES_IN", "15m"),
   refreshTokenExpiresIn: getJwtExpiry("REFRESH_TOKEN_EXPIRES_IN", "7d"),
   emailOtpExpiresInMinutes: Number(process.env.EMAIL_OTP_EXPIRES_IN_MINUTES ?? 10),
-  resendApiKey: getRequiredEnv("RESEND_API_KEY"),
-  resendFromEmail: getRequiredEnv("RESEND_FROM_EMAIL"),
-  resendFromName: process.env.RESEND_FROM_NAME ?? "GoTracks"
+  emailOtpMaxPerHour: Number(process.env.EMAIL_OTP_MAX_PER_HOUR ?? 5),
+  smtpHost: getRequiredEnv("SMTP_HOST"),
+  smtpPort: Number(process.env.SMTP_PORT ?? 587),
+  smtpSecure: getBooleanEnv("SMTP_SECURE", false),
+  smtpRequireTls: getBooleanEnv("SMTP_REQUIRE_TLS", true),
+  smtpUser: getRequiredEnv("SMTP_USER"),
+  smtpPass: getRequiredEnv("SMTP_PASS"),
+  smtpFromEmail: getRequiredEnv("SMTP_FROM_EMAIL"),
+  smtpFromName: process.env.SMTP_FROM_NAME ?? "GoTrack Official"
 };

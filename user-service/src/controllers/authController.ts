@@ -4,6 +4,7 @@ import { env } from "../config/env.js";
 import {
   loginUser,
   logoutUser,
+  regenerateSignupOtp,
   refreshUserToken,
   signupUser,
   verifySignupOtp
@@ -68,6 +69,28 @@ export const verifyOtp = async (
       message: "Email verified successfully",
       ...authPayload,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const regenerateOtp = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { email } = req.body as {
+      email?: string;
+    };
+
+    if (!email) {
+      throw new AppError("Email is required", 400);
+    }
+
+    const otpResponse = await regenerateSignupOtp({ email });
+
+    res.status(200).json(otpResponse);
   } catch (error) {
     next(error);
   }
